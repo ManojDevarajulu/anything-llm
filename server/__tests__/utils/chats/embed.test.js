@@ -98,7 +98,10 @@ describe("streamChatWithForEmbed overrides", () => {
 });
 
 describe("streamChatWithForEmbed saving the chat", () => {
-  async function chatWithReply(textResponse, { streaming = true } = {}) {
+  async function chatWithReply(
+    textResponse,
+    { streaming = true, completion } = {}
+  ) {
     EmbedChats.forEmbedByUser.mockResolvedValueOnce([]);
     getVectorDbClass.mockReturnValue({
       hasNamespace: async () => false,
@@ -110,7 +113,8 @@ describe("streamChatWithForEmbed saving the chat", () => {
         streamingEnabled: () => streaming,
         streamGetChatCompletion: async () => ({ metrics: {} }),
         handleStream: async () => textResponse,
-        getChatCompletion: async () => ({ textResponse, metrics: {} }),
+        getChatCompletion: async () =>
+          completion !== undefined ? completion : { textResponse, metrics: {} },
       },
       routingMetadata: null,
       prefetchedContext: { pinnedDocs: [] },
@@ -139,6 +143,12 @@ describe("streamChatWithForEmbed saving the chat", () => {
 
   it("saves nothing when a non-streaming reply is empty", async () => {
     await chatWithReply("", { streaming: false });
+    expect(EmbedChats.new).not.toHaveBeenCalled();
+  });
+
+  it("saves nothing when a non-streaming connector returns null", async () => {
+    // Many connectors return null when the provider sent back no usable completion.
+    await chatWithReply(null, { streaming: false, completion: null });
     expect(EmbedChats.new).not.toHaveBeenCalled();
   });
 });

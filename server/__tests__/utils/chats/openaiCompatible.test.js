@@ -165,6 +165,23 @@ describe('OpenAICompatibleChat', () => {
 
       expect(result).toBeTruthy();
     });
+
+    test('returns a no_content completion when the connector returns null', async () => {
+      // Many connectors return null when the provider sent back no usable completion.
+      mockLLMConnector.getChatCompletion.mockResolvedValue(null);
+
+      const result = await OpenAICompatibleChat.chatSync({
+        workspace: mockWorkspace,
+        prompt: 'Hello',
+        systemPrompt: 'You are a helpful assistant',
+        history: [],
+        temperature: 0.7
+      });
+
+      expect(result.choices[0].finish_reason).toBe('no_content');
+      expect(result.choices[0].message.content).toBeNull();
+      expect(WorkspaceChats.new).not.toHaveBeenCalled();
+    });
   });
 
   describe('streamChat', () => {

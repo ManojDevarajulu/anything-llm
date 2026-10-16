@@ -199,8 +199,9 @@ async function streamChatWithForEmbed(
     console.log(
       `\x1b[31m[STREAMING DISABLED]\x1b[0m Streaming is not available for ${LLMConnector.constructor.name}. Will use regular chat method.`
     );
+    // Connectors return null when the provider sent back no usable completion.
     const { textResponse, metrics: performanceMetrics } =
-      await LLMConnector.getChatCompletion(messages);
+      (await LLMConnector.getChatCompletion(messages)) ?? {};
     completeText = textResponse;
     metrics = addChatCostToMetrics(performanceMetrics, {
       routingMetadata,

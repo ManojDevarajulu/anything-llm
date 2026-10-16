@@ -442,3 +442,82 @@ describe("ApiChatHandler @agent persistence", () => {
     });
   });
 });
+
+describe("ApiChatHandler null completion", () => {
+  const { DocumentManager } = require("../../../utils/DocumentManager");
+  const { recentChatHistory } = require("../../../utils/chats/index");
+
+  // Many connectors return null when the provider sent back no usable completion.
+  function connectorReturningNull({ streaming = false } = {}) {
+    return {
+      promptWindowLimit: () => 8000,
+      compressMessages: jest.fn().mockResolvedValue([]),
+      streamingEnabled: () => streaming,
+      getChatCompletion: jest.fn().mockResolvedValue(null),
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    EphemeralAgentHandler.isAgentInvocation.mockResolvedValue(false);
+    getVectorDbClass.mockReturnValue({
+      hasNamespace: jest.fn().mockResolvedValue(true),
+      namespaceCount: jest.fn().mockResolvedValue(1),
+      performSimilaritySearch: jest
+        .fn()
+        .mockResolvedValue({ contextTexts: [], sources: [], message: null }),
+    });
+    recentChatHistory.mockResolvedValue({ rawHistory: [], chatHistory: [] });
+    DocumentManager.mockImplementation(() => ({
+      pinnedDocs: async () => [],
+    }));
+    resolveProviderConnector.mockResolvedValue({
+      connector: connectorReturningNull(),
+      routingMetadata: null,
+    });
+    WorkspaceChats.new.mockResolvedValue({ chat: { id: 123 } });
+  });
+
+  test("chatSync aborts with the empty completion error instead of throwing", async () => {
+    const result = await ApiChatHandler.chatSync({
+      workspace,
+      message: "hello",
+      mode: "chat",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        type: "abort",
+        textResponse: null,
+        close: true,
+        error: "No text completion could be completed with this input.",
+      })
+    );
+    expect(WorkspaceChats.new).not.toHaveBeenCalled();
+  });
+
+  test("streamChat finalizes without saving when a non-streaming connector returns null", async () => {
+    resolveProviderConnector.mockResolvedValue({
+      connector: connectorReturningNull({ streaming: false }),
+      routingMetadata: null,
+    });
+    const response = {}; // express response — writeResponseChunk is mocked
+
+    await ApiChatHandler.streamChat({
+      response,
+      workspace,
+      message: "hello",
+      mode: "chat",
+    });
+
+    expect(WorkspaceChats.new).not.toHaveBeenCalled();
+    expect(writeResponseChunk).toHaveBeenCalledWith(
+      response,
+      expect.objectContaining({
+        type: "finalizeResponseStream",
+        close: true,
+        error: false,
+      })
+    );
+  });
+});

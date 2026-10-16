@@ -175,8 +175,9 @@ async function chatSync({
   });
 
   // Send the text completion.
+  // Connectors return null when the provider sent back no usable completion.
   const { textResponse, metrics: completionMetrics } =
-    await LLMConnector.getChatCompletion(messages);
+    (await LLMConnector.getChatCompletion(messages)) ?? {};
   const metrics = addChatCostToMetrics(completionMetrics, {
     routingMetadata,
     workspace,

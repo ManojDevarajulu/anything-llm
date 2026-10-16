@@ -287,10 +287,11 @@ async function generateResponse({
     await flushEdit(true);
     metrics = stream.metrics || {};
   } else {
+    // Connectors return null when the provider sent back no usable completion.
     const { textResponse, metrics: performanceMetrics } =
-      await LLMConnector.getChatCompletion(messages, {
+      (await LLMConnector.getChatCompletion(messages, {
         user: null,
-      });
+      })) ?? {};
     completeText = textResponse;
     metrics = performanceMetrics || {};
     if (completeText?.length > 0)

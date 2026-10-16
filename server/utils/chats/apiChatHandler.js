@@ -449,10 +449,11 @@ async function chatSync({
   );
 
   // Send the text completion.
+  // Connectors return null when the provider sent back no usable completion.
   const { textResponse, metrics: completionMetrics } =
-    await LLMConnector.getChatCompletion(messages, {
+    (await LLMConnector.getChatCompletion(messages, {
       user: user,
-    });
+    })) ?? {};
   const performanceMetrics = addChatCostToMetrics(completionMetrics, {
     routingMetadata,
     workspace,
@@ -847,9 +848,9 @@ async function streamChat({
       `\x1b[31m[STREAMING DISABLED]\x1b[0m Streaming is not available for ${LLMConnector.constructor.name}. Will use regular chat method.`
     );
     const { textResponse, metrics: performanceMetrics } =
-      await LLMConnector.getChatCompletion(messages, {
+      (await LLMConnector.getChatCompletion(messages, {
         user: user,
-      });
+      })) ?? {};
     completeText = textResponse;
     metrics = addChatCostToMetrics(performanceMetrics, {
       routingMetadata,
